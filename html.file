@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI·GLASS — Assistive Navigation Concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0C0F14;
+    --panel:#141821cc;
+    --panel-line:#262C38;
+    --ink:#EDEFF3;
+    --ink-dim:#8892A0;
+    --sense:#D98A4C;
+    --process:#9AA3B2;
+    --feedback:#5FC9C9;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter',sans-serif; overflow:hidden; height:100%; width:100%;}
+  #scene{position:fixed;inset:0;}
+  canvas{display:block; cursor:grab; touch-action:none;}
+  canvas:active{cursor:grabbing;}
+
+  .hud{position:fixed; z-index:10; pointer-events:none;}
+  .hud button{pointer-events:auto;}
+
+  header.hud{top:0;left:0;right:0;padding:26px 30px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;}
+  .brand{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; letter-spacing:0.01em;}
+  .brand span{color:var(--ink-dim); font-weight:400; font-size:11px; display:block; font-family:'IBM Plex Mono',monospace; margin-top:5px; letter-spacing:0.05em;}
+
+  .controls{display:flex; gap:10px; flex-direction:column; align-items:flex-end;}
+  .toggle-group{display:flex; background:var(--panel); backdrop-filter:blur(8px); border:1px solid var(--panel-line); border-radius:999px; padding:4px;}
+  .toggle-group button{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.05em; text-transform:uppercase;
+    background:transparent; border:none; color:var(--ink-dim); padding:8px 15px; border-radius:999px; cursor:pointer; transition:all .25s ease;
+  }
+  .toggle-group button.active{background:var(--ink); color:var(--bg); font-weight:600;}
+  .toggle-group button:disabled{opacity:0.28; cursor:not-allowed;}
+
+  footer.hud{bottom:0;left:0;right:0; padding:22px 30px; display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;}
+  .legend{display:flex; gap:20px; background:var(--panel); backdrop-filter:blur(8px); border:1px solid var(--panel-line); padding:11px 18px; border-radius:12px;}
+  .legend-item{display:flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-dim); letter-spacing:0.03em;}
+  .legend-dot{width:7px;height:7px;border-radius:50%; flex:none;}
+
+  .hint{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-dim); letter-spacing:0.03em; text-align:right; line-height:1.6;}
+
+  .label{
+    position:absolute; transform:translate(-50%,-100%); z-index:5;
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; white-space:nowrap;
+    pointer-events:none; opacity:0; text-align:center;
+  }
+  .label .dot{width:6px;height:6px;border-radius:50%; margin:0 auto 6px;}
+  .label .name{color:var(--ink); font-weight:500; letter-spacing:0.03em;}
+  .label .spec{color:var(--ink-dim); font-size:9.5px; margin-top:2px;}
+
+  .caption{
+    position:fixed; left:50%; bottom:96px; transform:translateX(-50%);
+    font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-dim);
+    letter-spacing:0.03em; opacity:0; transition:opacity .4s ease; z-index:10; text-align:center;
+    background:var(--panel); backdrop-filter:blur(8px); border:1px solid var(--panel-line);
+    padding:9px 16px; border-radius:999px;
+  }
+  .caption.show{opacity:1;}
+
+  .loading{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-dim); letter-spacing:0.08em; z-index:20;}
+
+  @media (max-width:720px){
+    header.hud{flex-direction:column;}
+    .controls{align-items:flex-start; width:100%;}
+    footer.hud{flex-direction:column; align-items:flex-start;}
+    .hint{text-align:left;}
+  }
+</style>
+</head>
+<body>
+
+<div id="scene"></div>
+<div class="loading" id="loading">LOADING MODEL…</div>
+
+<header class="hud">
+  <div class="brand">AI · GLASS<span>ASSISTIVE NAVIGATION — CONCEPT MODEL 01</span></div>
+  <div class="controls">
+    <div class="toggle-group" id="viewToggle">
+      <button data-view="standalone" class="active">Standalone</button>
+      <button data-view="worn">Worn</button>
+    </div>
+    <div class="toggle-group" id="stateToggle">
+      <button data-state="assembled" class="active">Assembled</button>
+      <button data-state="exploded">Exploded · Parts</button>
+    </div>
+  </div>
+</header>
+
+<footer class="hud">
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:#D98A4C"></span>01 · Sense</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#9AA3B2"></span>02 · Process</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#5FC9C9"></span>03 · Feedback</div>
+  </div>
+  <div class="hint">Drag to rotate · Scroll to zoom<br>Conceptual visualization — for team reference only</div>
+</footer>
+
+<div class="caption" id="wornCaption">Rests on nose bridge + behind ear · ear canal stays open for ambient sound alongside bone-conduction audio</div>
+
+<div id="labels"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const container = document.getElementById('scene');
+  const labelsRoot = document.getElementById('labels');
+  const loadingEl = document.getElementById('loading');
+
+  const COLORS = { sense:0xD98A4C, process:0x9AA3B2, feedback:0x5FC9C9 };
+
+  // ---------- renderer / scene / camera ----------
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0C0F14);
+  scene.fog = new THREE.Fog(0x0C0F14, 9, 18);
+
+  const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 100);
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  container.appendChild(renderer.domElement);
+
+  // ---------- lights ----------
+  scene.add(new THREE.AmbientLight(0x8891a5, 0.55));
+  const key = new THREE.DirectionalLight(0xfff2e0, 1.15); key.position.set(4,6,6); scene.add(key);
+  const fill = new THREE.DirectionalLight(0x6fa8dc, 0.32); fill.position.set(-5,2,-3); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.55); rim.position.set(0,3,-6); scene.add(rim);
+
+  // ---------- materials ----------
+  const chassisMat = new THREE.MeshStandardMaterial({ color:0x1c2029, metalness:0.65, roughness:0.32 });
+  const lensMat = new THREE.MeshPhysicalMaterial({ color:0x1a2230, metalness:0.1, roughness:0.08, transparent:true, opacity:0.45 });
+  const senseMat = new THREE.MeshStandardMaterial({ color:COLORS.sense, metalness:0.65, roughness:0.28, emissive:0x2a1508, emissiveIntensity:0.5 });
+  const processMat = new THREE.MeshStandardMaterial({ color:COLORS.process, metalness:0.45, roughness:0.4 });
+  const feedbackMat = new THREE.MeshStandardMaterial({ color:COLORS.feedback, metalness:0.55, roughness:0.28, emissive:0x0c2323, emissiveIntensity:0.5 });
+  const headMat = new THREE.MeshStandardMaterial({ color:0x2A2E38, metalness:0.05, roughness:0.95 });
+
+  // ---------- glasses group ----------
+  const glasses = new THREE.Group();
+  scene.add(glasses);
+
+  function addChassis(mesh){ chassis.add(mesh); }
+  const chassis = new THREE.Group();
+  glasses.add(chassis);
+
+  // lens rims + lenses
+  [-1,1].forEach(side=>{
+    const rimTorus = new THREE.Mesh(new THREE.TorusGeometry(0.5,0.06,16,48), chassisMat);
+    rimTorus.scale.set(1.14,1,1);
+    rimTorus.position.set(side*0.85,0,0);
+    addChassis(rimTorus);
+
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.46,32), lensMat);
+    lens.position.set(side*0.85,0,0.01);
+    addChassis(lens);
+  });
+
+  // bridge
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.09,0.09), chassisMat);
+  bridge.position.set(0,0.02,0.02);
+  addChassis(bridge);
+
+  // hinges + temple arms + ear hooks (built per side, static chassis)
+  const templeAnchors = {}; // store world-ish local anchor points for reference
+  [-1,1].forEach(side=>{
+    const hinge = new THREE.Group();
+    hinge.position.set(side*1.5,0,-0.05);
+    hinge.rotation.y = side*0.15;
+    chassis.add(hinge);
+
+    const hingeMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.14,12), chassisMat);
+    hingeMesh.rotation.z = Math.PI/2;
+    hinge.add(hingeMesh);
+
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.09,1.9), chassisMat);
+    arm.position.set(0,0,-1.0);
+    hinge.add(arm);
+
+    const earHookGroup = new THREE.Group();
+    earHookGroup.position.set(0,0,-1.95);
+    earHookGroup.rotation.x = -0.38;
+    earHookGroup.rotation.y = side*0.22;
+    hinge.add(earHookGroup);
+
+    const earHook = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.08,0.56), chassisMat);
+    earHook.position.set(0,0,-0.28);
+    earHookGroup.add(earHook);
+
+    templeAnchors[side] = { hinge };
+  });
+
+  // ---------- helper to make labeled/unlabeled parts ----------
+  const parts = []; // {mesh, assembled(Vector3), exploded(Vector3), stage, title, spec, labeled}
+
+  function makePart(mesh, assembledPos, explodedPos, stage, title, spec){
+    mesh.position.copy(assembledPos);
+    glasses.add(mesh);
+    const stageColor = stage==='sense'?COLORS.sense:stage==='process'?COLORS.process:COLORS.feedback;
+    let line=null;
+    if(title){
+      const geo = new THREE.BufferGeometry().setFromPoints([assembledPos, assembledPos]);
+      const mat = new THREE.LineBasicMaterial({ color:stageColor, transparent:true, opacity:0 });
+      line = new THREE.Line(geo, mat);
+      glasses.add(line);
+    }
+    const labelEl = title ? createLabelEl(stageColor, title, spec) : null;
+    parts.push({ mesh, assembled:assembledPos.clone(), exploded:explodedPos.clone(), stage, title, spec, line, labelEl });
+  }
+
+  function createLabelEl(color, title, spec){
+    const el = document.createElement('div');
+    el.className = 'label';
+    el.innerHTML = `<div class="dot" style="background:#${color.toString(16).padStart(6,'0')}"></div><div class="name">${title}</div><div class="spec">${spec}</div>`;
+    labelsRoot.appendChild(el);
+    return el;
+  }
+
+  // Front sensor (camera)
+  {
+    const g = new THREE.Group();
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.18,20), chassisMat);
+    barrel.rotation.x = Math.PI/2; barrel.position.z = 0.09;
+    g.add(barrel);
+    const glass = new THREE.Mesh(new THREE.CircleGeometry(0.075,20), new THREE.MeshStandardMaterial({color:0x0a0d12, metalness:0.9, roughness:0.15}));
+    glass.position.z = 0.185; g.add(glass);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1,0.018,10,24), senseMat);
+    ring.position.z = 0.185; g.add(ring);
+    const pointLight = new THREE.PointLight(COLORS.sense, 0.7, 2.4);
+    pointLight.position.z = 0.2; g.add(pointLight);
+    makePart(g, new THREE.Vector3(0,0.05,0.45), new THREE.Vector3(0,0.35,2.1), 'sense',
+      'Front Sensor', 'Wide-angle cam · obstacle / text / face ID');
+    g.userData.pulseLight = pointLight;
+  }
+
+  // Depth / ultrasonic sensors
+  [-1,1].forEach(side=>{
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.03,16), senseMat);
+    m.rotation.x = Math.PI/2;
+    const a = new THREE.Vector3(side*1.55,0.42,0.08);
+    const e = new THREE.Vector3(side*2.0,0.75,1.7);
+    if(side===1){ makePart(m,a,e,'sense','Depth Sensors','Ultrasonic · close-range distance, L + R'); }
+    else { makePart(m,a,e,'sense',null,null); }
+  });
+
+  // Microphone array (right temple top) — grouped, single label
+  {
+    const g = new THREE.Group();
+    [-0.15,0,0.15].forEach(o=>{
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.035,12,12), senseMat);
+      dot.position.set(o,0,0);
+      g.add(dot);
+    });
+    makePart(g, new THREE.Vector3(1.95,0.16,-0.55), new THREE.Vector3(2.5,0.4,0.9), 'sense',
+      'Microphone Array', '3-mic beamforming · voice commands + ambient');
+  }
+
+  // Edge AI processor
+  {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.28,0.06,0.4), processMat);
+    makePart(m, new THREE.Vector3(1.9,0.13,-1.0), new THREE.Vector3(1.9,1.9,-0.65), 'process',
+      'Edge AI Processor', 'On-device inference · works fully offline');
+  }
+
+  // Battery
+  {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.08,0.5), processMat);
+    makePart(m, new THREE.Vector3(2.1,-0.11,-1.35), new THREE.Vector3(2.1,1.55,-1.05), 'process',
+      'Battery', '~8 hrs continuous use · USB-C fast charge');
+  }
+
+  // Bone-conduction speaker (left ear)
+  {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.05,20), feedbackMat);
+    m.rotation.z = Math.PI/2;
+    makePart(m, new THREE.Vector3(-2.15,-0.35,-1.9), new THREE.Vector3(-2.7,-0.6,-3.5), 'feedback',
+      'Bone-Conduction Speaker', 'Audio guidance · ear canal stays open');
+  }
+
+  // Haptic actuator
+  {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.06,14,14), feedbackMat);
+    makePart(m, new THREE.Vector3(-2.05,-0.45,-1.75), new THREE.Vector3(-2.55,-0.75,-3.35), 'feedback',
+      'Haptic Actuator', 'Directional vibration cues');
+  }
+
+  // ---------- head bust (worn mode) ----------
+  const head = new THREE.Group();
+  head.visible = false;
+  scene.add(head);
+
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(1,32,32), headMat);
+  skull.scale.set(0.82,1.02,0.92);
+  skull.position.set(0,1.42,-0.08);
+  head.add(skull);
+
+  const noseBridge = new THREE.Mesh(new THREE.ConeGeometry(0.09,0.22,12), headMat);
+  noseBridge.rotation.x = Math.PI/2.1;
+  noseBridge.position.set(0,1.28,0.72);
+  head.add(noseBridge);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.5,0.7,24), headMat);
+  neck.position.set(0,0.55,-0.05);
+  head.add(neck);
+
+  const shoulders = new THREE.Mesh(new THREE.CylinderGeometry(0.95,1.15,0.45,24), headMat);
+  shoulders.position.set(0,0.0,-0.05);
+  head.add(shoulders);
+
+  const earL = new THREE.Mesh(new THREE.SphereGeometry(0.11,12,12), headMat);
+  earL.scale.set(0.5,1,0.7); earL.position.set(-0.78,1.42,-0.05); head.add(earL);
+  const earR = earL.clone(); earR.position.x = 0.78; head.add(earR);
+
+  // ---------- state ----------
+  let currentView = 'standalone';   // standalone | worn
+  let currentState = 'assembled';   // assembled | exploded
+  let explodeT = 0, explodeTarget = 0;
+
+  const targetPos = { x:0, y:0, z:0 };
+  const camTarget = new THREE.Vector3(0,0,0);
+  const camTargetGoal = new THREE.Vector3(0,0,0);
+  let radius = 5.6, radiusGoal = 5.6;
+  let theta = 0.5, phi = 1.18;
+
+  const glassesGoalPos = new THREE.Vector3(0,0,0);
+  const glassesGoalScale = 1;
+
+  function setView(view){
+    currentView = view;
+    document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
+    const explodedBtn = document.querySelector('#stateToggle button[data-state="exploded"]');
+    if(view==='worn'){
+      head.visible = true;
+      glassesGoalPos.set(0,1.46,0.62);
+      camTargetGoal.set(0,1.32,0);
+      radiusGoal = 6.6;
+      explodedBtn.disabled = true;
+      setState('assembled');
+      document.getElementById('wornCaption').classList.add('show');
+    } else {
+      glassesGoalPos.set(0,0,0);
+      camTargetGoal.set(0,0,0);
+      radiusGoal = 5.6;
+      explodedBtn.disabled = false;
+      document.getElementById('wornCaption').classList.remove('show');
+    }
+  }
+
+  function setState(state){
+    currentState = state;
+    document.querySelectorAll('#stateToggle button').forEach(b=>b.classList.toggle('active', b.dataset.state===state));
+    explodeTarget = state==='exploded' ? 1 : 0;
+  }
+
+  document.getElementById('viewToggle').addEventListener('click', e=>{
+    const btn = e.target.closest('button'); if(!btn || btn.disabled) return;
+    setView(btn.dataset.view);
+  });
+  document.getElementById('stateToggle').addEventListener('click', e=>{
+    const btn = e.target.closest('button'); if(!btn || btn.disabled) return;
+    setState(btn.dataset.state);
+  });
+
+  // ---------- manual orbit controls ----------
+  let dragging=false, lastX=0, lastY=0;
+  const dom = renderer.domElement;
+  dom.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; dom.setPointerCapture(e.pointerId); });
+  dom.addEventListener('pointerup', ()=> dragging=false);
+  dom.addEventListener('pointerleave', ()=> dragging=false);
+  dom.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const dx = e.clientX-lastX, dy = e.clientY-lastY;
+    lastX=e.clientX; lastY=e.clientY;
+    theta -= dx*0.0055;
+    phi -= dy*0.0045;
+    phi = Math.max(0.35, Math.min(2.5, phi));
+  });
+  dom.addEventListener('wheel', e=>{
+    e.preventDefault();
+    radiusGoal += e.deltaY*0.0018;
+    radiusGoal = Math.max(3.2, Math.min(10, radiusGoal));
+  }, { passive:false });
+
+  // gentle idle auto-rotate (paused if reduced motion or user dragging)
+  let idleRot = 0;
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- init UI ----------
+  setView('standalone');
+  setState('assembled');
+  loadingEl.style.display='none';
+
+  // ---------- animation loop ----------
+  const tmpV = new THREE.Vector3();
+  const clock = new THREE.Clock();
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(),0.05);
+
+    if(!dragging && !reduceMotion){ idleRot += dt*0.045; theta += dt*0.045; }
+
+    // smooth interpolations
+    explodeT += (explodeTarget-explodeT)*0.07;
+    radius += (radiusGoal-radius)*0.08;
+    camTarget.lerp(camTargetGoal, 0.06);
+    glasses.position.lerp(glassesGoalPos, 0.06);
+    const goalScale = currentView==='worn' ? 0.94 : 1;
+    glasses.scale.setScalar(glasses.scale.x + (goalScale-glasses.scale.x)*0.08);
+
+    camera.position.set(
+      camTarget.x + radius*Math.sin(phi)*Math.sin(theta),
+      camTarget.y + radius*Math.cos(phi),
+      camTarget.z + radius*Math.sin(phi)*Math.cos(theta)
+    );
+    camera.lookAt(camTarget);
+
+    // update part positions + lines + labels
+    const showLabels = currentState==='exploded' && currentView==='standalone';
+    parts.forEach(p=>{
+      p.mesh.position.lerpVectors(p.assembled, p.exploded, explodeT);
+      if(p.line){
+        const posAttr = p.line.geometry.attributes.position;
+        posAttr.setXYZ(0, p.assembled.x,p.assembled.y,p.assembled.z);
+        posAttr.setXYZ(1, p.mesh.position.x,p.mesh.position.y,p.mesh.position.z);
+        posAttr.needsUpdate = true;
+        p.line.material.opacity = explodeT*0.55;
+      }
+      if(p.labelEl){
+        if(showLabels && explodeT>0.08){
+          tmpV.copy(p.mesh.position);
+          glasses.localToWorld(tmpV);
+          tmpV.project(camera);
+          const x = (tmpV.x*0.5+0.5)*window.innerWidth;
+          const y = (1-(tmpV.y*0.5+0.5))*window.innerHeight;
+          p.labelEl.style.left = x+'px';
+          p.labelEl.style.top = (y-14)+'px';
+          p.labelEl.style.opacity = Math.min(1,(explodeT-0.08)*1.6);
+        } else {
+          p.labelEl.style.opacity = 0;
+        }
+      }
+    });
+
+    if(!reduceMotion){
+      const t = clock.elapsedTime;
+      const frontSensor = parts[0];
+      if(frontSensor && frontSensor.mesh.userData.pulseLight){
+        frontSensor.mesh.userData.pulseLight.intensity = 0.55 + Math.sin(t*1.6)*0.18;
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>
